@@ -1,0 +1,7 @@
+{
+  "name": "tap-airtable",
+  "variant": "goes-funky",
+  "pip_url": "git+https://github.com/pedroceriotti/tap-airtable.git",
+  "executable": "tap-airtable",
+  "capabilities": ["properties", "discover"]
+}
