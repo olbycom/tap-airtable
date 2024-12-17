@@ -1,30 +1,25 @@
+import base64
 import json
 import urllib.parse
 from copy import deepcopy
-import base64
 
 import singer
 from requests import Session
 from requests.adapters import HTTPAdapter, Retry
 from singer import metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
-from slugify import slugify
 
 
 def write_secrets(config: dict) -> None:
-    import sys
     import json
+    import sys
 
-    if 'token' not in config or 'refresh_token' not in config:
+    if "token" not in config or "refresh_token" not in config:
         return
 
     secrets = {
         "type": "CREDENTIALS_CHANGED",
-        "secret": {
-            "access_token": config["token"],
-            "refresh_token": config["refresh_token"],
-            "token_type": "Bearer"
-        }
+        "secret": {"access_token": config["token"], "refresh_token": config["refresh_token"], "token_type": "Bearer"},
     }
     message = json.dumps(secrets)
     sys.stdout.write(message + "\n")
@@ -34,9 +29,7 @@ def write_secrets(config: dict) -> None:
 def init_session() -> Session:
     session = Session()
 
-    retries = Retry(
-        total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504, 429]
-    )
+    retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504, 429])
     session.mount("https://", HTTPAdapter(max_retries=retries))
     session.mount("http://", HTTPAdapter(max_retries=retries))
 
@@ -48,7 +41,7 @@ class CatalogEntry(CatalogEntry):
     def to_dict(self):
         result = super(CatalogEntry, self).to_dict()
         if self.group:
-            result['group'] = self.group
+            result["group"] = self.group
         return result
 
 
@@ -66,13 +59,14 @@ class Airtable(object):
     def refresh_token(cls, config):
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": "Basic " + base64.b64encode(f"{config['client_id']}:{config['client_secret']}".encode("utf-8")).decode("utf-8")
+            "Authorization": "Basic "
+            + base64.b64encode(f"{config['client_id']}:{config['client_secret']}".encode("utf-8")).decode("utf-8"),
         }
 
         data = {
             "grant_type": "refresh_token",
             "refresh_token": config["refresh_token"],
-            "scope": "data.records:read data.recordComments:read schema.bases:read user.email:read"
+            "scope": "data.records:read data.recordComments:read schema.bases:read user.email:read",
         }
 
         response = cls.session.post(cls.token_url, headers=headers, data=data)
@@ -103,7 +97,7 @@ class Airtable(object):
     def run_discovery(cls, args):
         cls.__apply_config(args.config)
         if "base_id" in args.config:
-            base_id = args.config['base_id']
+            base_id = args.config["base_id"]
             entries = cls.discover_base(base_id)
             return Catalog(entries).dump()
 
@@ -135,15 +129,12 @@ class Airtable(object):
         response.raise_for_status()
         bases = []
         for base in response.json()["bases"]:
-            bases.append({
-                "id": base["id"],
-                "name": base["name"]
-            })
+            bases.append({"id": base["id"], "name": base["name"]})
         return bases
 
     @classmethod
     def __get_auth_header(cls):
-        return {'Authorization': 'Bearer {}'.format(cls.token)}
+        return {"Authorization": "Bearer {}".format(cls.token)}
 
     @classmethod
     def discover_base(cls, base_id, base_name=None):
@@ -154,19 +145,20 @@ class Airtable(object):
         entries = []
 
         for table in response.json()["tables"]:
-            schema_cols = {"id": Schema(inclusion="automatic", type=['null', "string"])}
+            schema_cols = {"_airtable_record_id": Schema(inclusion="automatic", type=["null", "string"])}
 
             meta = {}
 
             table_name = table["name"]
             keys = []
             meta = metadata.write(meta, (), "inclusion", "available")
-            meta = metadata.write(meta, 'database_name', 'base_id', base_id)
+            meta = metadata.write(meta, "database_name", "base_id", base_id)
 
             for field in table["fields"]:
                 # numbers are not allowed at the start of column name in big query
                 # check if the name starts with digit, keep the same naming but add a character before
                 field_name = field["name"]
+
                 if field["name"][0].isdigit():
                     field_name = "c_" + field_name
 
@@ -175,36 +167,50 @@ class Airtable(object):
                     keys.append(field_name)
 
                 if field_name in schema_cols:
-                    field_ids = metadata.get(meta, ('properties', field_name), 'airtable_field_ids') or []
+                    field_ids = metadata.get(meta, ("properties", field_name), "airtable_field_ids") or []
                     field_ids.append(field["id"])
 
-                    meta = metadata.write(meta, ('properties', field_name), 'airtable_field_ids', field_ids)
+                    meta = metadata.write(
+                        meta,
+                        ("properties", field_name),
+                        "airtable_field_ids",
+                        field_ids,
+                    )
                     continue
 
                 schema_cols[field_name] = col_schema
 
-                meta = metadata.write(meta, ('properties', field_name), 'inclusion', 'available')
-                meta = metadata.write(meta, ('properties', field_name), 'real_name', field['name'])
-                meta = metadata.write(meta, ('properties', field_name), 'airtable_type', field["type"] or None)
-                meta = metadata.write(meta, ('properties', field_name), 'airtable_field_ids', [field["id"]])
+                meta = metadata.write(meta, ("properties", field_name), "inclusion", "available")
+                meta = metadata.write(meta, ("properties", field_name), "real_name", field["name"])
+                meta = metadata.write(
+                    meta,
+                    ("properties", field_name),
+                    "airtable_type",
+                    field["type"] or None,
+                )
+                meta = metadata.write(
+                    meta,
+                    ("properties", field_name),
+                    "airtable_field_ids",
+                    [field["id"]],
+                )
 
-            schema = Schema(type='object', properties=schema_cols)
+            schema = Schema(type="object", properties=schema_cols)
             entry = CatalogEntry(
                 tap_stream_id=table["id"],
                 database=base_name or base_id,
                 table=table_name,
-                stream=table_name,
+                stream=table["id"],
                 metadata=metadata.to_list(meta),
                 key_properties=keys,
-                schema=schema
+                schema=schema,
             )
 
             # Differ tables from base name
-            setattr(entry, 'group', base_name)
+            setattr(entry, "group", base_name)
             entries.append(entry)
 
         return entries
-
 
     @classmethod
     def column_schema(cls, col_info):
@@ -223,16 +229,16 @@ class Airtable(object):
 
         schema = Schema(inclusion=inclusion)
 
-        singer_type = 'string'
+        singer_type = "string"
         if air_type in number_types:
-            singer_type = 'number'
+            singer_type = "number"
 
-        schema.type = ['null', singer_type]
+        schema.type = ["null", singer_type]
 
         if air_type in date_types:
-            schema.format = 'date-time'
+            schema.format = "date-time"
         if air_type in ["date"]:
-            schema.format = 'date'
+            schema.format = "date"
 
         return schema
 
@@ -263,20 +269,19 @@ class Airtable(object):
     def _find_column(cls, col, meta_data):
         for m in meta_data:
             if "breadcrumb" in m and "properties" in m["breadcrumb"] and m["breadcrumb"][1] == col:
-                return m["metadata"]["real_name"]
+                if m["metadata"].get("real_name"):
+                    return m["metadata"]["real_name"]
 
     @classmethod
     def run_sync(cls, config, properties):
         cls.__apply_config(config)
 
-        streams = properties['streams']
+        streams = properties["streams"]
 
         for stream in streams:
             schema = stream["schema"]["properties"]
             base_id = cls._find_base_id(stream)
-            table = stream['table_name']
-
-            table_slug = slugify(table, separator="_")
+            table = stream["table_name"]
             col_defs, field_ids = cls._find_selected_columns(stream)
 
             counter = 0
@@ -284,21 +289,25 @@ class Airtable(object):
                 cls.logger.info("will import " + table)
 
                 response = Airtable.get_response(base_id, table, field_ids, counter=counter)
-                records = response.json().get('records')
+                records = response.json().get("records")
 
                 if records:
                     col_schema = deepcopy(col_defs)
-                    col_schema["id"] = schema["id"]
-                    singer.write_schema(table_slug, {"properties": col_schema}, stream["key_properties"])
-                    singer.write_records(table_slug, cls._map_records(stream, records))
+                    col_schema["_airtable_record_id"] = schema["_airtable_record_id"]
+
+                    # replace % and # to avoid duplicated columns
+                    col_schema = {k.replace("%", "percent").replace("#", "number"): v for k, v in col_schema.items()}
+
+                    singer.write_schema(stream["tap_stream_id"], {"properties": col_schema}, stream["key_properties"])
+                    singer.write_records(stream["tap_stream_id"], cls._map_records(stream, records))
                     offset = response.json().get("offset")
 
                     while offset:
                         counter += 1
                         response = Airtable.get_response(base_id, table, field_ids, offset, counter=counter)
-                        records = response.json().get('records')
+                        records = response.json().get("records")
                         if records:
-                            singer.write_records(table_slug, cls._map_records(stream, records))
+                            singer.write_records(stream["tap_stream_id"], cls._map_records(stream, records))
                             offset = response.json().get("offset")
 
     @classmethod
@@ -318,7 +327,12 @@ class Airtable(object):
                     val = cls.cast_type(val, requested_type)
                 row[col] = val
 
-            row["id"] = r["id"]
+            # rename original columnd ID to avoid duplicate conflicts with user created columns with the same name
+            row["_airtable_record_id"] = r["id"]
+
+            # replace % and # to avoid duplicated columns
+            row = {k.replace("%", "percent").replace("#", "number"): v for k, v in row.items()}
+
             # TODO: cast to string/numbers?
             mapped.append(row)
         return mapped
@@ -335,10 +349,10 @@ class Airtable(object):
 
     @classmethod
     def get_response(cls, base_id, table, fields, offset=None, counter=0):
-        table = urllib.parse.quote(table, safe='')
-        uri = cls.records_url + base_id + '/' + table
+        table = urllib.parse.quote(table, safe="")
+        uri = cls.records_url + base_id + "/" + table
 
-        uri += '?'
+        uri += "?"
         params = {}
 
         if fields:
@@ -350,16 +364,24 @@ class Airtable(object):
 
         response = cls.session.get(uri, headers=cls.__get_auth_header())
 
-        cls.logger.info("METRIC " + json.dumps({
-            "type": "counter",
-            "metric": "page",
-            "value": counter,
-        }))
+        cls.logger.info(
+            "METRIC "
+            + json.dumps(
+                {
+                    "type": "counter",
+                    "metric": "page",
+                    "value": counter,
+                }
+            )
+        )
         if response.status_code != 200:
-            cls.logger.info("REASON " + json.dumps({
-                "value": response.text,
-            }))
+            cls.logger.info(
+                "REASON "
+                + json.dumps(
+                    {
+                        "value": response.text,
+                    }
+                )
+            )
         response.raise_for_status()
         return response
-
-
