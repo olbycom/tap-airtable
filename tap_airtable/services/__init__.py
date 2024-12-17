@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import urllib.parse
 from copy import deepcopy
 
@@ -8,6 +9,9 @@ from requests import Session
 from requests.adapters import HTTPAdapter, Retry
 from singer import metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
+
+internal_logger = logging.getLogger("internal")
+user_logger = logging.getLogger("user")
 
 
 def write_secrets(config: dict) -> None:
@@ -52,7 +56,6 @@ class Airtable(object):
     token = None
     selected_by_default = False
     remove_emojis = False
-    logger = singer.get_logger()
     session = init_session()
 
     @classmethod
@@ -82,13 +85,14 @@ class Airtable(object):
             cls.__apply_config(config)
             write_secrets(config)
 
-            cls.logger.info("Token refreshed successfully")
+            internal_logger.info("Token refreshed successfully")
         else:
-            cls.logger.warning(f"Failed to refresh token: {response.status_code} -> {response.json()}")
+            internal_logger.warning(f"Failed to refresh token: {response.status_code} -> {response.json()}")
 
             response_dict = response.json()
 
             if response_dict.get("error_description", "") == "Invalid token.":
+                user_logger.error("Refresh token has expired. Please update your configuration with a new token.")
                 raise Exception("Refresh token has expired. Please re-authenticate to make it work again.")
 
         return config
@@ -138,7 +142,7 @@ class Airtable(object):
 
     @classmethod
     def discover_base(cls, base_id, base_name=None):
-        cls.logger.info("discover base " + base_id)
+        internal_logger.info("discover base " + base_id)
         headers = cls.__get_auth_header()
         response = cls.session.get(url=cls.metadata_url + base_id + "/tables", headers=headers)
         response.raise_for_status()
@@ -286,7 +290,7 @@ class Airtable(object):
 
             counter = 0
             if len(col_defs) > 0:
-                cls.logger.info("will import " + table)
+                internal_logger.info("will import " + table)
 
                 response = Airtable.get_response(base_id, table, field_ids, counter=counter)
                 records = response.json().get("records")
@@ -364,7 +368,7 @@ class Airtable(object):
 
         response = cls.session.get(uri, headers=cls.__get_auth_header())
 
-        cls.logger.info(
+        internal_logger.info(
             "METRIC "
             + json.dumps(
                 {
@@ -375,7 +379,7 @@ class Airtable(object):
             )
         )
         if response.status_code != 200:
-            cls.logger.info(
+            internal_logger.info(
                 "REASON "
                 + json.dumps(
                     {

@@ -1,12 +1,16 @@
+import logging
+
 import backoff
 import singer
-import logging
-from tap_airtable.services import Airtable
 from requests.exceptions import HTTPError
+from tap_airtable.services import Airtable
+
+internal_logger = logging.getLogger("internal")
+user_logger = logging.getLogger("user")
 
 
 REQUIRED_CONFIG_KEYS = [
-    'token',
+    "token",
 ]
 
 
@@ -14,16 +18,14 @@ class CustomException(Exception):
     pass
 
 
-@backoff.on_exception(backoff.expo,
-                      CustomException,
-                      max_tries=3)
+@backoff.on_exception(backoff.expo, CustomException, max_tries=3)
 def operate(main_args):
     try:
         if main_args.discover:
-            logging.info("Discovery started")
+            internal_logger.info("Discovery started")
             Airtable.run_discovery(main_args)
         elif main_args.properties:
-            logging.info("Import started")
+            user_logger.info("Sync started")
             Airtable.run_sync(main_args.config, main_args.properties)
     except HTTPError as e:
         if e.response.status_code == 401:
@@ -34,8 +36,10 @@ def operate(main_args):
             logging.exception(e)
             exit(-1)
     except Exception as e:
-        singer.logger.log_error(str(e))
-        logging.exception(e)
+        internal_logger.error(
+            f"Error on execution: {e}",
+            exc_info=True,
+        )
         exit(1)
 
 
