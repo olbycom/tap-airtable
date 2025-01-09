@@ -5,13 +5,11 @@ import urllib.parse
 from copy import deepcopy
 
 import singer
+from custom_logger import internal_logger, user_logger
 from requests import Session
 from requests.adapters import HTTPAdapter, Retry
 from singer import metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
-
-internal_logger = logging.getLogger("internal")
-user_logger = logging.getLogger("user")
 
 
 def write_secrets(config: dict) -> None:
