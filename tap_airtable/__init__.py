@@ -34,10 +34,7 @@ def operate(main_args):
             logging.exception(e)
             exit(-1)
     except Exception as e:
-        internal_logger.error(
-            f"Error on execution: {e}",
-            exc_info=True,
-        )
+        internal_logger.exception(f"Error on execution: {e}")
         exit(1)
 
 
