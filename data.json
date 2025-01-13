@@ -1,7 +1,7 @@
 {
   "name": "tap-airtable",
   "variant": "goes-funky",
-  "pip_url": "git+https://github.com/olbycom/tap-airtable.git@nekt",
+  "pip_url": "-e ./extract/tap-airtable",
   "executable": "tap-airtable",
   "capabilities": ["properties", "discover"]
 }
