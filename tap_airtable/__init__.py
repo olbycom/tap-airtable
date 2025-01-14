@@ -1,11 +1,14 @@
 import sys
 
 import backoff
+import custom_logger
 import singer
 from custom_logger import internal_logger, user_logger
 from requests.exceptions import HTTPError
 
 from tap_airtable.services import Airtable
+
+_ = custom_logger
 
 REQUIRED_CONFIG_KEYS = [
     "token",
