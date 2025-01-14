@@ -1,4 +1,4 @@
-import logging
+import sys
 
 import backoff
 import singer
@@ -30,12 +30,11 @@ def operate(main_args):
             main_args.config = Airtable.refresh_token(main_args.config)
             raise CustomException()
         else:
-            singer.logger.log_error(str(e))
-            logging.exception(e)
-            exit(-1)
+            internal_logger.exception(e)
+            sys.exit(-1)
     except Exception as e:
         internal_logger.exception(f"Error on execution: {e}")
-        exit(1)
+        sys.exit(1)
 
 
 def main():
