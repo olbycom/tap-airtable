@@ -24,7 +24,7 @@ setup(
         "python-slugify==4.0.1",
         "six==1.12.0",
         "tzlocal==1.5.1",
-        "custom-logger @ git+https://github.com/olbycom/nekt-custom-logger-module.git@v0.0.6",
+        "custom-logger @ git+https://github.com/olbycom/nekt-custom-logger-module.git@v0.0.6#egg=custom-logger",
     ],
     entry_points="""
           [console_scripts]
